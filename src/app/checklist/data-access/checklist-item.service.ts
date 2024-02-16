@@ -4,9 +4,11 @@ import { Subject } from 'rxjs';
 import {
   AddChecklistItem,
   ChecklistItem,
+  EditChecklistItem,
   RemoveChecklistItem,
 } from '../../shared/interfaces/checklist-item';
 import { StorageService } from '../../shared/data-access/storage.service';
+import { RemoveChecklist } from '../../shared/interfaces/checklist';
 
 export interface ChecklistItemsState {
   checklistItems: ChecklistItem[];
@@ -33,6 +35,10 @@ export class ChecklistItemService {
   add$ = new Subject<AddChecklistItem>();
   toggle$ = new Subject<RemoveChecklistItem>();
   reset$ = new Subject<RemoveChecklistItem>();
+  remove$ = new Subject<RemoveChecklistItem>();
+  edit$ = new Subject<EditChecklistItem>();
+  checklistRemoved$ = new Subject<RemoveChecklist>();
+
   private checklistItemsLoaded$ = this.storageService.loadChecklistItems();
 
   constructor() {
@@ -71,6 +77,24 @@ export class ChecklistItemService {
       }))
     );
 
+    this.edit$.pipe(takeUntilDestroyed()).subscribe((checkListItem) =>
+      this.state.update((state) => ({
+        ...state,
+        checklistItems: state.checklistItems.map((item) =>
+          item.id === checkListItem.id
+            ? { ...item, title: checkListItem.data.title }
+            : item
+        ),
+      }))
+    );
+
+    this.remove$.pipe(takeUntilDestroyed()).subscribe((id) =>
+      this.state.update((state) => ({
+        ...state,
+        checklistItems: state.checklistItems.filter((item) => item.id !== id),
+      }))
+    );
+
     this.checklistItemsLoaded$
       .pipe(takeUntilDestroyed())
       .subscribe((checklistItems: ChecklistItem[]) =>
@@ -80,6 +104,15 @@ export class ChecklistItemService {
           loaded: true,
         }))
       );
+
+    this.checklistRemoved$.pipe(takeUntilDestroyed()).subscribe((checklistId) =>
+      this.state.update((state) => ({
+        ...state,
+        checklistItems: state.checklistItems.filter(
+          (item) => item.checklistId !== checklistId
+        ),
+      }))
+    );
 
     effect(() => {
       if (this.loaded()) {
